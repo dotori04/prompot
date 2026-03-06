@@ -1,0 +1,4 @@
+repository "prompot/prompot@14569174689120@cloud"
+  path "/"
+    br "/main"
+    co "/main"
