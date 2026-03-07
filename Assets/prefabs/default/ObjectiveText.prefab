@@ -110,6 +110,14 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 2602216123640164295}
     m_Modifications:
+    - target: {fileID: 3413553151446974073, guid: 0bacc2c3151127343887e434ab9af5df, type: 3}
+      propertyPath: m_fontSize
+      value: 20
+      objectReference: {fileID: 0}
+    - target: {fileID: 3413553151446974073, guid: 0bacc2c3151127343887e434ab9af5df, type: 3}
+      propertyPath: m_fontSizeBase
+      value: 20
+      objectReference: {fileID: 0}
     - target: {fileID: 3748872775021640577, guid: 0bacc2c3151127343887e434ab9af5df, type: 3}
       propertyPath: m_Pivot.x
       value: 0
