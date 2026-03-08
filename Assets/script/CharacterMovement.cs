@@ -15,22 +15,26 @@ public class CharacterMovement : MonoBehaviour
     private Queue<CommandData> actionQueue = new Queue<CommandData>();
     private bool isExecutingSequence = false;
     private System.Action onSequenceComplete;
-    private Vector3 teleportOffset = Vector3.zero;
+    
+    private Vector3 pendingTeleportOffset = Vector3.zero;
 
     void Start()
     {
         rb = GetComponent<Rigidbody>();
-        rb.constraints = RigidbodyConstraints.FreezeRotation; 
+        
+        // 물리 설정 강제 적용
+        rb.useGravity = true; // 중력 사용! (핵심)
+        rb.isKinematic = false; 
+        rb.interpolation = RigidbodyInterpolation.Interpolate; 
+        rb.constraints = RigidbodyConstraints.FreezeRotation; // 회전은 코드로만
     }
 
     public void StartSequence(List<CommandData> commands, System.Action onComplete)
     {
         StopAllMovement();
         actionQueue.Clear();
-        teleportOffset = Vector3.zero;
+        pendingTeleportOffset = Vector3.zero;
         this.onSequenceComplete = onComplete;
-
-        if (rb != null) rb.isKinematic = true;
 
         foreach (var cmd in commands)
         {
@@ -54,30 +58,24 @@ public class CharacterMovement : MonoBehaviour
         switch (currentCmd.action)
         {
             case ActionType.Stop:
-                actionQueue.Clear(); 
+                actionQueue.Clear();
                 break;
+
             case ActionType.Wait:
-                if (rb != null) 
-                {
-                    rb.linearVelocity = Vector3.zero;  
-                    rb.angularVelocity = Vector3.zero;
-                    rb.isKinematic = false;            
-                }
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+                // 대기 중 찌꺼기 속도 제거 및 좌표 보정
+                SnapToGrid(); 
                 float waitTime = currentCmd.distance > 0 ? currentCmd.distance : 1f;
                 yield return new WaitForSeconds(waitTime);
                 break;
+
             case ActionType.Jump:
-                if (rb != null) rb.isKinematic = false; 
                 rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
                 yield return new WaitForSeconds(jumpWaitTime);
-                if (rb != null && actionQueue.Count > 0 && actionQueue.Peek().action == ActionType.Move)
-                {
-                     rb.isKinematic = true;
-                     rb.linearVelocity = Vector3.zero;
-                }
                 break;
+
             case ActionType.Move:
-                if (rb != null) rb.isKinematic = true;
                 yield return StartCoroutine(TurnAndMoveRoutine(currentCmd.dir, currentCmd.distance));
                 break;
         }
@@ -89,18 +87,22 @@ public class CharacterMovement : MonoBehaviour
     private void FinishSequence()
     {
         isExecutingSequence = false;
-        if (rb != null) 
+        if (rb != null)
         {
-            rb.isKinematic = false;
             rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            SnapToGrid(); // 시퀀스 끝날 때도 깔끔하게 보정
         }
         onSequenceComplete?.Invoke();
     }
 
     private IEnumerator TurnAndMoveRoutine(MoveDir dir, float dist)
     {
-        // 1. 회전 로직 (기존 유지)
-        Quaternion startRot = transform.rotation;
+        // [핵심 1] 회전하기 전에 좌표를 정수로 딱 맞춤 (누적 오차 제거)
+        SnapToGrid();
+
+        // 1. 회전 로직
+        Quaternion startRot = rb.rotation;
         Quaternion targetRot = startRot;
         bool needTurn = false;
 
@@ -109,75 +111,109 @@ public class CharacterMovement : MonoBehaviour
 
         if (needTurn)
         {
-            while (Quaternion.Angle(transform.rotation, targetRot) > 0.1f)
+            // 회전 중
+            while (Quaternion.Angle(rb.rotation, targetRot) > 0.1f)
             {
-                transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRot, turnSpeed * Time.deltaTime);
-                yield return null;
+                Quaternion nextRot = Quaternion.RotateTowards(rb.rotation, targetRot, turnSpeed * Time.fixedDeltaTime);
+                rb.MoveRotation(nextRot);
+                yield return new WaitForFixedUpdate();
             }
-            transform.rotation = targetRot;
+            rb.MoveRotation(targetRot);
         }
 
         Vector3 moveDirVector = transform.forward;
         if (dir == MoveDir.Backward) moveDirVector = -transform.forward;
 
-        // 2. 이동할 총 '칸' 수 계산
-        int steps = 0;
-        bool isInfinite = false;
-
-        if (dist == -1f) isInfinite = true;
-        else steps = Mathf.RoundToInt(dist);
-
+        // 2. 이동 로직
+        int steps = (dist == -1f) ? 999 : Mathf.RoundToInt(dist);
         int currentStep = 0;
 
-        // 3. [핵심 수정] 한 칸씩 쪼개서 레이저로 검사하고 이동합니다!
-        while (isInfinite || currentStep < steps)
+        while ((dist == -1f || currentStep < steps))
         {
-            float gridSize = 1f; // 1칸의 거리
-            RaycastHit hit;
+            float gridSize = 1f;
             
-            // 내 코앞 딱 1칸만 먼저 검사
-            if (Physics.Raycast(transform.position + Vector3.up * 0.5f, moveDirVector, out hit, gridSize, ~0, QueryTriggerInteraction.Ignore))
+            // A. 정면 장애물 감지
+            if (Physics.Raycast(rb.position + Vector3.up * 0.5f, moveDirVector, out RaycastHit hitObstacle, gridSize, ~0, QueryTriggerInteraction.Ignore))
             {
-                if (hit.collider.CompareTag("Block"))
+                if (hitObstacle.collider.CompareTag("Block"))
                 {
-                    PushableBox box = hit.collider.GetComponent<PushableBox>();
+                    PushableBox box = hitObstacle.collider.GetComponent<PushableBox>();
                     if (box != null)
                     {
-                        Debug.Log("📦 [플레이어] 코앞에 박스 발견! 밀기 시도.");
-                        // 박스를 밀어보고, 벽에 막혀서 안 밀린다면 내 이동도 즉시 취소!
                         if (!box.TryPush(moveDirVector, gridSize))
                         {
-                            Debug.LogWarning("⚠️ 박스가 벽에 막혔습니다. 더 이상 전진할 수 없습니다.");
                             StopAllMovement();
-                            yield break; 
+                            yield break;
                         }
                     }
                 }
-                else if (hit.collider.CompareTag("Wall"))
+                else if (hitObstacle.collider.CompareTag("Wall"))
                 {
-                    Debug.LogWarning("⚠️ 코앞에 벽이 있습니다. 전진을 멈춥니다.");
                     StopAllMovement();
-                    yield break; 
+                    yield break;
                 }
             }
 
-            // 앞이 뚫려있거나 박스를 밀어냈다면, 내 몸을 딱 '1칸만' 전진!
-            Vector3 targetPos = transform.position + moveDirVector * gridSize;
-            while (Vector3.Distance(transform.position, targetPos) > 0.05f)
+            // B. 목표 위치 계산 (높이는 건드리지 않음 -> 중력에 맡김)
+            Vector3 startPos = rb.position;
+            // X, Z만 계산하고 Y는 현재 위치 유지 (하지만 중력이 아래로 당김)
+            Vector3 targetPos = startPos + (moveDirVector * gridSize);
+
+            // C. 1칸 이동
+            if (pendingTeleportOffset != Vector3.zero)
             {
-                if (teleportOffset != Vector3.zero)
-                {
-                    targetPos += teleportOffset; 
-                    teleportOffset = Vector3.zero; 
-                }
-                transform.position = Vector3.MoveTowards(transform.position, targetPos, moveSpeed * Time.deltaTime);
-                yield return null;
+                targetPos += pendingTeleportOffset;
+                rb.position += pendingTeleportOffset;
+                pendingTeleportOffset = Vector3.zero;
             }
-            transform.position = targetPos; // 1칸 이동 완료 후 위치 딱 맞게 보정
-            
-            currentStep++; // 걸음 수 1 증가 (이걸 목표 거리까지 반복)
-        }
 
+            // 수평 거리만 계산 (Y축 오차 무시)
+            Vector3 startPosFlat = new Vector3(startPos.x, 0, startPos.z);
+            Vector3 targetPosFlat = new Vector3(targetPos.x, 0, targetPos.z);
+            float distanceToMove = Vector3.Distance(startPosFlat, targetPosFlat);
+            
+            float travelTime = distanceToMove / moveSpeed;
+            float elapsedTime = 0f;
+
+            while (elapsedTime < travelTime)
+            {
+                if (pendingTeleportOffset != Vector3.zero)
+                {
+                    targetPos += pendingTeleportOffset;
+                    rb.position += pendingTeleportOffset;
+                    pendingTeleportOffset = Vector3.zero;
+                }
+
+                elapsedTime += Time.fixedDeltaTime;
+                
+                // 현재 진행률에 따른 X, Z 위치 계산
+                float t = elapsedTime / travelTime;
+                Vector3 newPos = Vector3.Lerp(startPos, targetPos, t);
+                
+                // [핵심 2] Y축은 물리 엔진이 알아서 하도록 놔둠 (현재 Y 유지 or 중력 반영)
+                // MovePosition은 물리 연산을 포함하므로, 여기서 Y를 강제로 startPos.y로 고정하면 공중부양함.
+                // 따라서 목표지점의 Y를 '현재 Rigidbody의 Y'로 계속 갱신해주는 것이 자연스러움.
+                newPos.y = rb.position.y; 
+
+                rb.MovePosition(newPos);
+                yield return new WaitForFixedUpdate();
+            }
+
+            // 미세 오차 방지를 위해 이동 후 X,Z 좌표 정수화 (Snap)
+            SnapToGrid();
+            currentStep++;
+        }
+    }
+
+    // [신규 기능] 좌표를 정수로 딱 맞춰주는 함수
+    private void SnapToGrid()
+    {
+        Vector3 currentPos = rb.position;
+        // X, Z는 반올림하여 정수로, Y는 그대로 둠 (바닥 높이 유지)
+        float snappedX = Mathf.Round(currentPos.x);
+        float snappedZ = Mathf.Round(currentPos.z);
+        
+        rb.MovePosition(new Vector3(snappedX, currentPos.y, snappedZ));
     }
 
     public void StopAllMovement()
@@ -185,22 +221,17 @@ public class CharacterMovement : MonoBehaviour
         StopAllCoroutines();
         actionQueue.Clear();
         isExecutingSequence = false;
-        teleportOffset = Vector3.zero;
-        if (rb != null) 
+        pendingTeleportOffset = Vector3.zero;
+        if (rb != null)
         {
-            if (!rb.isKinematic) 
-            {
-                rb.linearVelocity = Vector3.zero;
-                rb.angularVelocity = Vector3.zero;
-            }
-            rb.isKinematic = false; 
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
         }
     }
 
     public void RequestTeleport(Vector3 newPos)
     {
         Vector3 offset = newPos - transform.position;
-        transform.position = newPos;
-        teleportOffset += offset;
+        pendingTeleportOffset += offset;
     }
 }

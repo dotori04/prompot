@@ -1,13 +1,13 @@
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.SceneManagement;
+using UnityEngine.SceneManagement; // 이건 없어도 되지만, 혹시 모르니 남겨둡니다.
 using TMPro;
 
 public class LevelSelectUI : MonoBehaviour
 {
     [Header("버튼 설정")]
-    public Button[] levelButtons; // 인스펙터에서 레벨 1, 2, 3... 버튼을 순서대로 넣으세요.
-    public Sprite lockedSprite;   // 잠긴 버튼에 보여줄 이미지 (선택)
+    public Button[] levelButtons; 
+    public Sprite lockedSprite;   
 
     void Start()
     {
@@ -15,19 +15,20 @@ public class LevelSelectUI : MonoBehaviour
 
         for (int i = 0; i < levelButtons.Length; i++)
         {
-            int levelNum = i + 1; // 배열은 0부터지만 레벨은 1부터 시작
+            int levelNum = i + 1; 
 
             if (levelNum <= reachedLevel)
             {
                 // [해금된 레벨]
                 levelButtons[i].interactable = true;
                 
-                // 버튼 텍스트를 "1", "2" 등으로 변경
                 TextMeshProUGUI btnText = levelButtons[i].GetComponentInChildren<TextMeshProUGUI>();
                 if (btnText != null) btnText.text = levelNum.ToString();
 
-                // 클릭 시 해당 씬으로 이동 (람다식 활용)
-                string sceneName = "Level_" + levelNum; // 씬 이름 규칙: Level_1, Level_2...
+                string sceneName = "Level_" + levelNum; 
+                
+                // 클릭 시 리스너 연결
+                // 람다식 안에서 LoadLevel 함수를 호출합니다.
                 levelButtons[i].onClick.AddListener(() => LoadLevel(sceneName));
             }
             else
@@ -35,27 +36,29 @@ public class LevelSelectUI : MonoBehaviour
                 // [잠긴 레벨]
                 levelButtons[i].interactable = false;
                 
-                // 잠김 이미지 변경 (있다면)
                 if (lockedSprite != null)
                 {
                     levelButtons[i].image.sprite = lockedSprite;
                 }
                 
                 TextMeshProUGUI btnText = levelButtons[i].GetComponentInChildren<TextMeshProUGUI>();
-                if (btnText != null) btnText.text = ""; // 텍스트 숨김
+                if (btnText != null) btnText.text = ""; 
             }
         }
     }
 
+    // [핵심 수정 부분]
     void LoadLevel(string sceneName)
     {
-        SceneManager.LoadScene(sceneName);
+        // 기존: SceneManager.LoadScene(sceneName);
+        // 변경: 로딩 매니저에게 "로딩 화면 띄우면서 이동해줘!" 라고 부탁합니다.
+        LoadingSceneManager.LoadScene(sceneName);
     }
     
-    // 개발용: 데이터 리셋 버튼 연결용
     public void ResetAllData()
     {
         LevelData.ResetData();
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name); // UI 새로고침
+        // 리셋 후 현재 씬(메인메뉴) 새로고침은 로딩바 없이 즉시 해도 괜찮습니다.
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name); 
     }
 }

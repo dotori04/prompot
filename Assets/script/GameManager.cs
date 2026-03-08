@@ -9,15 +9,15 @@ public class GameManager : MonoBehaviour
     [Header("🎯 할당 설정")]
     public GameObject playerCharacter;
     public Transform spawnPoint;
-    
+
     [Header("UI 설정")]
     public GameObject clearUIPanel;
-    public TextMeshProUGUI objectiveTextUI; 
+    public TextMeshProUGUI objectiveTextUI;
 
     [Header("게임 규칙")]
     public int currentLevelIndex = 1;
     public float fallThreshold = -10.0f;
-    
+
     [TextArea(2, 3)]
     public string levelObjective = "도착 지점으로 이동하세요.";
 
@@ -43,8 +43,8 @@ public class GameManager : MonoBehaviour
 
     public void InitializeGame()
     {
-        ResetStatusOnly(); 
-        RespawnPlayer();   
+        ResetStatusOnly();
+        RespawnPlayer();
 
         // 1. 캐릭터가 진행 중이던 명령 강제 중지
         if (playerCharacter != null)
@@ -65,10 +65,10 @@ public class GameManager : MonoBehaviour
     {
         isLevelClear = false;
         Time.timeScale = 1.0f;
-        
+
         // Start 이후의 초기화(리스폰 등)를 위해서 여기에도 남겨둡니다.
         if (clearUIPanel != null) clearUIPanel.SetActive(false);
-        
+
         if (objectiveTextUI != null)
         {
             objectiveTextUI.text = $"목표: {levelObjective}";
@@ -89,7 +89,7 @@ public class GameManager : MonoBehaviour
             if (playerCharacter.transform.position.y < fallThreshold)
             {
                 Debug.Log($"📉 추락 감지! (현재 Y: {playerCharacter.transform.position.y}) 대기 취소 및 즉시 리스폰!");
-                InitializeGame(); 
+                InitializeGame();
             }
         }
     }
@@ -103,7 +103,7 @@ public class GameManager : MonoBehaviour
         else
         {
             Debug.Log("❌ 실패! (처음으로 복귀)");
-            InitializeGame(); 
+            InitializeGame();
         }
     }
 
@@ -111,7 +111,7 @@ public class GameManager : MonoBehaviour
     {
         if (isLevelClear) return;
         isLevelClear = true;
-        
+
         if (clearUIPanel != null) clearUIPanel.SetActive(true);
         LevelData.UnlockLevel(currentLevelIndex);
         Debug.Log("🏆 스테이지 클리어!");
@@ -134,14 +134,27 @@ public class GameManager : MonoBehaviour
 
     public void LoadNextLevel()
     {
+        // 다음 레벨 이름 계산
         string nextSceneName = "Level_" + (currentLevelIndex + 1);
-        if (Application.CanStreamedLevelBeLoaded(nextSceneName)) SceneManager.LoadScene(nextSceneName);
-        else SceneManager.LoadScene("Main_Menu");
+
+        // [수정] 씬이 실제로 존재하는지 확인 후, 로딩 매니저를 통해 이동!
+        if (Application.CanStreamedLevelBeLoaded(nextSceneName))
+        {
+            // 기존: SceneManager.LoadScene(nextSceneName);
+            // 변경:
+            LoadingSceneManager.LoadScene(nextSceneName);
+        }
+        else
+        {
+            Debug.Log("🏁 모든 레벨 클리어! 메인 메뉴로 돌아갑니다.");
+            LoadingSceneManager.LoadScene("Main_Menu");
+        }
     }
 
+    // 메인 메뉴로 가는 함수도 로딩을 거치고 싶다면:
     public void GoToMainMenu()
     {
         Time.timeScale = 1.0f;
-        SceneManager.LoadScene("Main_Menu");
+        LoadingSceneManager.LoadScene("Main_Menu");
     }
 }
