@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 5027824991343479248}
   - component: {fileID: 2704490226379122170}
   - component: {fileID: 6883377220822084533}
+  - component: {fileID: -3602433503226260260}
   m_Layer: 3
   m_Name: Player
   m_TagString: Player
@@ -43,7 +44,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4350483285605256310}
-  m_Mesh: {fileID: -6734620852318575487, guid: 5f602368eb0c40141a64e4ac0aa65bfe, type: 3}
+  m_Mesh: {fileID: -6734620852318575487, guid: bc7f60ee6990e5c4887c66b2799ba8f0, type: 3}
 --- !u!23 &4918224536614098342
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -69,7 +70,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: -5635484798206224817, guid: 5f602368eb0c40141a64e4ac0aa65bfe, type: 3}
+  - {fileID: 2100000, guid: 3dfd61bebd7dee74180a07ce00a47374, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -157,3 +158,25 @@ MonoBehaviour:
   turnSpeed: 300
   jumpForce: 5
   jumpWaitTime: 1
+--- !u!95 &-3602433503226260260
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4350483285605256310}
+  m_Enabled: 1
+  m_Avatar: {fileID: 9000000, guid: bc7f60ee6990e5c4887c66b2799ba8f0, type: 3}
+  m_Controller: {fileID: 9100000, guid: bed07393273d42b40abc527b75ee07d9, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0

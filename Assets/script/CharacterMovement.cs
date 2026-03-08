@@ -15,18 +15,19 @@ public class CharacterMovement : MonoBehaviour
     private Queue<CommandData> actionQueue = new Queue<CommandData>();
     private bool isExecutingSequence = false;
     private System.Action onSequenceComplete;
-    
+    private Animator anim;
     private Vector3 pendingTeleportOffset = Vector3.zero;
 
     void Start()
     {
         rb = GetComponent<Rigidbody>();
-        
+
         // 물리 설정 강제 적용
         rb.useGravity = true; // 중력 사용! (핵심)
-        rb.isKinematic = false; 
-        rb.interpolation = RigidbodyInterpolation.Interpolate; 
+        rb.isKinematic = false;
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
         rb.constraints = RigidbodyConstraints.FreezeRotation; // 회전은 코드로만
+        anim = GetComponentInChildren<Animator>();
     }
 
     public void StartSequence(List<CommandData> commands, System.Action onComplete)
@@ -65,7 +66,7 @@ public class CharacterMovement : MonoBehaviour
                 rb.linearVelocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
                 // 대기 중 찌꺼기 속도 제거 및 좌표 보정
-                SnapToGrid(); 
+                SnapToGrid();
                 float waitTime = currentCmd.distance > 0 ? currentCmd.distance : 1f;
                 yield return new WaitForSeconds(waitTime);
                 break;
@@ -120,6 +121,7 @@ public class CharacterMovement : MonoBehaviour
             }
             rb.MoveRotation(targetRot);
         }
+        if (anim != null) anim.SetBool("IsWalking", true);
 
         Vector3 moveDirVector = transform.forward;
         if (dir == MoveDir.Backward) moveDirVector = -transform.forward;
@@ -131,7 +133,7 @@ public class CharacterMovement : MonoBehaviour
         while ((dist == -1f || currentStep < steps))
         {
             float gridSize = 1f;
-            
+
             // A. 정면 장애물 감지
             if (Physics.Raycast(rb.position + Vector3.up * 0.5f, moveDirVector, out RaycastHit hitObstacle, gridSize, ~0, QueryTriggerInteraction.Ignore))
             {
@@ -171,7 +173,7 @@ public class CharacterMovement : MonoBehaviour
             Vector3 startPosFlat = new Vector3(startPos.x, 0, startPos.z);
             Vector3 targetPosFlat = new Vector3(targetPos.x, 0, targetPos.z);
             float distanceToMove = Vector3.Distance(startPosFlat, targetPosFlat);
-            
+
             float travelTime = distanceToMove / moveSpeed;
             float elapsedTime = 0f;
 
@@ -185,15 +187,15 @@ public class CharacterMovement : MonoBehaviour
                 }
 
                 elapsedTime += Time.fixedDeltaTime;
-                
+
                 // 현재 진행률에 따른 X, Z 위치 계산
                 float t = elapsedTime / travelTime;
                 Vector3 newPos = Vector3.Lerp(startPos, targetPos, t);
-                
+
                 // [핵심 2] Y축은 물리 엔진이 알아서 하도록 놔둠 (현재 Y 유지 or 중력 반영)
                 // MovePosition은 물리 연산을 포함하므로, 여기서 Y를 강제로 startPos.y로 고정하면 공중부양함.
                 // 따라서 목표지점의 Y를 '현재 Rigidbody의 Y'로 계속 갱신해주는 것이 자연스러움.
-                newPos.y = rb.position.y; 
+                newPos.y = rb.position.y;
 
                 rb.MovePosition(newPos);
                 yield return new WaitForFixedUpdate();
@@ -203,6 +205,7 @@ public class CharacterMovement : MonoBehaviour
             SnapToGrid();
             currentStep++;
         }
+        if (anim != null) anim.SetBool("IsWalking", false);
     }
 
     // [신규 기능] 좌표를 정수로 딱 맞춰주는 함수
@@ -212,7 +215,7 @@ public class CharacterMovement : MonoBehaviour
         // X, Z는 반올림하여 정수로, Y는 그대로 둠 (바닥 높이 유지)
         float snappedX = Mathf.Round(currentPos.x);
         float snappedZ = Mathf.Round(currentPos.z);
-        
+
         rb.MovePosition(new Vector3(snappedX, currentPos.y, snappedZ));
     }
 
@@ -222,6 +225,7 @@ public class CharacterMovement : MonoBehaviour
         actionQueue.Clear();
         isExecutingSequence = false;
         pendingTeleportOffset = Vector3.zero;
+        if (anim != null) anim.SetBool("IsWalking", false);
         if (rb != null)
         {
             rb.linearVelocity = Vector3.zero;

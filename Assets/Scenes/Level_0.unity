@@ -1885,7 +1885,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3996838319840215174, guid: 0e30184d6cfa15d4aaae4e50a287e388, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 1
+      value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 3996838319840215174, guid: 0e30184d6cfa15d4aaae4e50a287e388, type: 3}
       propertyPath: m_LocalPosition.z
@@ -2759,8 +2759,16 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2704490226379122170, guid: 1038f4d38373aa7469a1b52b04cf2bf7, type: 3}
+      propertyPath: m_Mass
+      value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 2704490226379122170, guid: 1038f4d38373aa7469a1b52b04cf2bf7, type: 3}
       propertyPath: m_Constraints
-      value: 80
+      value: 112
+      objectReference: {fileID: 0}
+    - target: {fileID: 2704490226379122170, guid: 1038f4d38373aa7469a1b52b04cf2bf7, type: 3}
+      propertyPath: m_LinearDamping
+      value: 0.1
       objectReference: {fileID: 0}
     - target: {fileID: 2704490226379122170, guid: 1038f4d38373aa7469a1b52b04cf2bf7, type: 3}
       propertyPath: m_CollisionDetection
@@ -2770,10 +2778,17 @@ PrefabInstance:
       propertyPath: m_Name
       value: Player
       objectReference: {fileID: 0}
+    - target: {fileID: 4918224536614098342, guid: 1038f4d38373aa7469a1b52b04cf2bf7, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 3dfd61bebd7dee74180a07ce00a47374, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 4350483285605256310, guid: 1038f4d38373aa7469a1b52b04cf2bf7, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1432064095}
   m_SourcePrefab: {fileID: 100100000, guid: 1038f4d38373aa7469a1b52b04cf2bf7, type: 3}
 --- !u!1 &1432064087 stripped
 GameObject:
@@ -2791,6 +2806,28 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 258329482037e6045aae0a8242bc342b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CharacterMovement
+--- !u!95 &1432064095
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1432064087}
+  m_Enabled: 1
+  m_Avatar: {fileID: 9000000, guid: b984c8f9af65f1e4399898a11ce57fc4, type: 3}
+  m_Controller: {fileID: 9100000, guid: bed07393273d42b40abc527b75ee07d9, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &1576363134
 GameObject:
   m_ObjectHideFlags: 0
