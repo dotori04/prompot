@@ -104,6 +104,10 @@ public class GameManager : MonoBehaviour
         {
             Debug.Log("❌ 실패! (처음으로 복귀)");
             InitializeGame();
+            // ✅ 위치 이동 대신, 우리가 만든 'Respawn 함수'를 호출합니다!
+            // (이 함수 안에 블록 초기화 + 위치 이동 기능이 다 들어있으니까요)
+            // "Player" 태그가 달린 오브젝트를 찾아서, 그 안의 CharacterMovement 스크립트의 Respawn 함수를 실행해라!
+            GameObject.FindGameObjectWithTag("Player").GetComponent<CharacterMovement>().Respawn();
         }
     }
 

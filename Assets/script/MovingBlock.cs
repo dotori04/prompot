@@ -4,7 +4,6 @@ using System.Collections;
 public class MovingBlock : MonoBehaviour
 {
     [Header("경로 설정")]
-    [Tooltip("이동할 경로를 나타내는 빈 오브젝트들을 순서대로 넣으세요.")]
     public Transform[] waypoints;
 
     [Header("이동 설정")]
@@ -13,50 +12,75 @@ public class MovingBlock : MonoBehaviour
     public bool isLoop = true;
 
     [Header("상호작용 설정")]
-    public Material activeMaterial; // 밟았을 때 변할 재질
+    public Material activeMaterial;
 
     private int currentPointIndex = 0;
     private bool isWaiting = false;
-    
-    // [핵심 추가] 플레이어가 위에 있는지 확인하는 변수
     private bool isPlayerOnBlock = false;
 
-    // 원래 재질 저장용
     private Material originalMaterial;
     private MeshRenderer meshRenderer;
 
-    void Start()
+    void Awake()
     {
         meshRenderer = GetComponent<MeshRenderer>();
+        if (meshRenderer != null) originalMaterial = meshRenderer.material;
+    }
 
-        if (meshRenderer != null)
-        {
-            originalMaterial = meshRenderer.material;
-        }
-
+    void Start()
+    {
         if (waypoints.Length > 0 && waypoints[0] != null)
         {
             transform.position = waypoints[0].position;
         }
     }
 
+    public void ResetBlock()
+    {
+        UnityEngine.Debug.Log($"🛠️ [MovingBlock] {gameObject.name} 초기화 시작.");
+
+        // 1. 동작 완전 정지
+        StopAllCoroutines();
+
+        // 2. 상태 초기화
+        currentPointIndex = 0;
+        isWaiting = false;
+        isPlayerOnBlock = false;
+
+        // 3. 재질 초기화
+        if (meshRenderer != null && originalMaterial != null)
+        {
+            meshRenderer.material = originalMaterial;
+        }
+
+        // 4. 위치 강제 이동
+        if (waypoints.Length > 0 && waypoints[0] != null)
+        {
+            UnityEngine.Debug.Log($"🛠️ [MovingBlock] {gameObject.name} 위치 이동 -> {waypoints[0].position}");
+            transform.position = waypoints[0].position;
+        }
+        else
+        {
+            UnityEngine.Debug.LogError($"🚨 [MovingBlock] {gameObject.name}의 Waypoint[0]이 비어있습니다!");
+        }
+        
+        // 5. 꺼져 있었더라도 다시 켜주기
+        this.enabled = true;
+    }
+
     void FixedUpdate()
     {
-        // 웨이포인트가 없거나, 대기 중이거나, 
-        // [중요] 플레이어가 위에 없으면 움직이지 않음!
         if (waypoints.Length == 0 || isWaiting || !isPlayerOnBlock) return;
-        
         Move();
     }
 
     private void Move()
     {
+        if (currentPointIndex >= waypoints.Length) currentPointIndex = 0;
         Transform targetPoint = waypoints[currentPointIndex];
         
-        // 이동 처리
         transform.position = Vector3.MoveTowards(transform.position, targetPoint.position, moveSpeed * Time.fixedDeltaTime);
 
-        // 목표 지점 도착 확인
         if (Vector3.Distance(transform.position, targetPoint.position) < 0.01f)
         {
             transform.position = targetPoint.position;
@@ -69,7 +93,6 @@ public class MovingBlock : MonoBehaviour
         isWaiting = true;
         yield return new WaitForSeconds(waitTime);
 
-        // 다음 목표 설정
         currentPointIndex++;
         if (currentPointIndex >= waypoints.Length)
         {
@@ -77,27 +100,20 @@ public class MovingBlock : MonoBehaviour
             else
             {
                 currentPointIndex = waypoints.Length - 1;
-                // 반복이 아니면 끝에 도달했을 때 아예 기능을 끕니다.
                 this.enabled = false; 
             }
         }
         isWaiting = false;
     }
 
-    // ---------------------------------------------------------
-    // 👣 충돌 감지 (탑승 여부 체크)
-    // ---------------------------------------------------------
     private void OnCollisionEnter(Collision collision)
     {
         if (collision.gameObject.CompareTag("Player"))
         {
-            isPlayerOnBlock = true; // [중요] 이제부터 움직임 허용!
-
-            collision.transform.SetParent(transform);
-            if (meshRenderer != null && activeMaterial != null)
-            {
-                meshRenderer.material = activeMaterial;
-            }
+            UnityEngine.Debug.Log($"🦶 [MovingBlock] 플레이어가 {gameObject.name} 위에 올라탐.");
+            isPlayerOnBlock = true;
+            collision.transform.SetParent(transform); 
+            if (meshRenderer != null && activeMaterial != null) meshRenderer.material = activeMaterial;
         }
     }
 
@@ -105,36 +121,25 @@ public class MovingBlock : MonoBehaviour
     {
         if (collision.gameObject.CompareTag("Player"))
         {
-            isPlayerOnBlock = false; // [중요] 움직임 정지!
-
-            collision.transform.SetParent(null);
-            if (meshRenderer != null && originalMaterial != null)
+            UnityEngine.Debug.Log($"🦶 [MovingBlock] 플레이어가 {gameObject.name}에서 벗어남.");
+            isPlayerOnBlock = false;
+            
+            if (collision.gameObject.activeInHierarchy) 
             {
-                meshRenderer.material = originalMaterial;
+                collision.transform.SetParent(null); 
             }
+            if (meshRenderer != null && originalMaterial != null) meshRenderer.material = originalMaterial;
         }
     }
 
-    // ---------------------------------------------------------
-    // 🎨 기즈모 (순차 연결)
-    // ---------------------------------------------------------
     void OnDrawGizmos()
     {
         if (waypoints == null || waypoints.Length < 2) return;
-
         Gizmos.color = Color.cyan;
-        foreach (var point in waypoints)
-        {
-            if (point != null) Gizmos.DrawWireSphere(point.position, 0.3f);
-        }
-
+        foreach (var point in waypoints) if (point != null) Gizmos.DrawWireSphere(point.position, 0.3f);
         Gizmos.color = Color.yellow;
         for (int i = 0; i < waypoints.Length - 1; i++)
-        {
             if (waypoints[i] != null && waypoints[i + 1] != null)
-            {
                 Gizmos.DrawLine(waypoints[i].position, waypoints[i + 1].position);
-            }
-        }
     }
 }

@@ -15,7 +15,7 @@ GameObject:
   - component: {fileID: 6591809669790138345}
   m_Layer: 0
   m_Name: moving_floar
-  m_TagString: Untagged
+  m_TagString: Respawn
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -132,4 +132,4 @@ MonoBehaviour:
   moveSpeed: 3
   waitTime: 1
   isLoop: 1
-  activeMaterial: {fileID: -876546973899608171, guid: f63d574838ccfb44f84acc05fed0af48, type: 3}
+  activeMaterial: {fileID: 2100000, guid: d4eec6c7d9ab2be46ab949e75ee0717a, type: 2}

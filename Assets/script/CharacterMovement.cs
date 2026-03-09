@@ -12,24 +12,89 @@ public class CharacterMovement : MonoBehaviour
     public float jumpWaitTime = 0.8f;
 
     private Rigidbody rb;
+    private Animator anim;
     private Queue<CommandData> actionQueue = new Queue<CommandData>();
     private bool isExecutingSequence = false;
     private System.Action onSequenceComplete;
-    private Animator anim;
     private Vector3 pendingTeleportOffset = Vector3.zero;
 
-    void Start()
+    IEnumerator Start()
     {
         rb = GetComponent<Rigidbody>();
-
-        // 물리 설정 강제 적용
-        rb.useGravity = true; // 중력 사용! (핵심)
-        rb.isKinematic = false;
-        rb.interpolation = RigidbodyInterpolation.Interpolate;
-        rb.constraints = RigidbodyConstraints.FreezeRotation; // 회전은 코드로만
         anim = GetComponentInChildren<Animator>();
+        
+        rb.useGravity = true;
+        rb.isKinematic = false; 
+        rb.interpolation = RigidbodyInterpolation.Interpolate; 
+        rb.constraints = RigidbodyConstraints.FreezeRotation; 
+
+        UnityEngine.Debug.Log("⏳ [CharacterMovement] 게임 시작. 1프레임 대기 중...");
+        yield return null; 
+
+        UnityEngine.Debug.Log("▶ [CharacterMovement] 대기 완료. Respawn 함수 호출!");
+        Respawn(); 
     }
 
+    public void Respawn()
+    {
+        UnityEngine.Debug.Log("🔄 [CharacterMovement] Respawn() 시작됨.");
+
+        // 1. 부모 해제 확인
+        if (transform.parent != null)
+        {
+            UnityEngine.Debug.Log($"🔓 [CharacterMovement] 현재 부모({transform.parent.name})에서 분리합니다.");
+            transform.SetParent(null);
+        }
+        else
+        {
+            UnityEngine.Debug.Log("🔓 [CharacterMovement] 부모 없음. 분리 불필요.");
+        }
+
+        // 2. Respawn 태그 찾기
+        GameObject spawnPoint = GameObject.FindGameObjectWithTag("Respawn");
+
+        if (spawnPoint != null)
+        {
+            UnityEngine.Debug.Log($"📍 [CharacterMovement] Respawn 위치 찾음: {spawnPoint.name} / 위치: {spawnPoint.transform.position}");
+
+            // 3. 블록 초기화
+            MovingBlock[] blocks = FindObjectsByType<MovingBlock>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            UnityEngine.Debug.Log($"📦 [CharacterMovement] 발견된 MovingBlock 개수: {blocks.Length}개");
+
+            foreach (var block in blocks)
+            {
+                block.ResetBlock(); 
+            }
+
+            // 4. 이동 로직 정지
+            StopAllMovement();
+
+            // 5. 강제 이동 실행
+            UnityEngine.Debug.Log($"🚀 [CharacterMovement] 플레이어 이동 실행! (현재: {transform.position} -> 목표: {spawnPoint.transform.position})");
+            
+            transform.position = spawnPoint.transform.position;
+            transform.rotation = spawnPoint.transform.rotation;
+            
+            if (rb != null)
+            {
+                rb.position = spawnPoint.transform.position;
+                rb.rotation = spawnPoint.transform.rotation;
+                rb.linearVelocity = Vector3.zero; 
+                rb.angularVelocity = Vector3.zero;
+                rb.Sleep(); 
+            }
+
+            SnapToGrid();
+            UnityEngine.Debug.Log($"✅ [CharacterMovement] 이동 완료. 현재 좌표: {transform.position}");
+        }
+        else
+        {
+            UnityEngine.Debug.LogError("🚨 [CharacterMovement] 심각한 오류: Scene에 'Respawn' 태그가 붙은 오브젝트가 없습니다!");
+        }
+    }
+
+    // ... (이하 StartSequence 등 나머지 코드는 기존과 동일하므로 생략하지 않고 그대로 유지) ...
+    
     public void StartSequence(List<CommandData> commands, System.Action onComplete)
     {
         StopAllMovement();
@@ -37,11 +102,7 @@ public class CharacterMovement : MonoBehaviour
         pendingTeleportOffset = Vector3.zero;
         this.onSequenceComplete = onComplete;
 
-        foreach (var cmd in commands)
-        {
-            actionQueue.Enqueue(cmd);
-        }
-
+        foreach (var cmd in commands) actionQueue.Enqueue(cmd);
         if (!isExecutingSequence) StartCoroutine(ExecuteNextCommand());
     }
 
@@ -61,21 +122,16 @@ public class CharacterMovement : MonoBehaviour
             case ActionType.Stop:
                 actionQueue.Clear();
                 break;
-
             case ActionType.Wait:
-                rb.linearVelocity = Vector3.zero;
-                rb.angularVelocity = Vector3.zero;
-                // 대기 중 찌꺼기 속도 제거 및 좌표 보정
-                SnapToGrid();
+                if (rb != null) { rb.linearVelocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
+                SnapToGrid(); 
                 float waitTime = currentCmd.distance > 0 ? currentCmd.distance : 1f;
                 yield return new WaitForSeconds(waitTime);
                 break;
-
             case ActionType.Jump:
-                rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
+                if (rb != null) rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
                 yield return new WaitForSeconds(jumpWaitTime);
                 break;
-
             case ActionType.Move:
                 yield return StartCoroutine(TurnAndMoveRoutine(currentCmd.dir, currentCmd.distance));
                 break;
@@ -92,17 +148,16 @@ public class CharacterMovement : MonoBehaviour
         {
             rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
-            SnapToGrid(); // 시퀀스 끝날 때도 깔끔하게 보정
+            SnapToGrid(); 
         }
         onSequenceComplete?.Invoke();
     }
 
     private IEnumerator TurnAndMoveRoutine(MoveDir dir, float dist)
     {
-        // [핵심 1] 회전하기 전에 좌표를 정수로 딱 맞춤 (누적 오차 제거)
         SnapToGrid();
+        if (anim != null) anim.SetBool("IsWalking", true);
 
-        // 1. 회전 로직
         Quaternion startRot = rb.rotation;
         Quaternion targetRot = startRot;
         bool needTurn = false;
@@ -112,7 +167,6 @@ public class CharacterMovement : MonoBehaviour
 
         if (needTurn)
         {
-            // 회전 중
             while (Quaternion.Angle(rb.rotation, targetRot) > 0.1f)
             {
                 Quaternion nextRot = Quaternion.RotateTowards(rb.rotation, targetRot, turnSpeed * Time.fixedDeltaTime);
@@ -121,32 +175,25 @@ public class CharacterMovement : MonoBehaviour
             }
             rb.MoveRotation(targetRot);
         }
-        if (anim != null) anim.SetBool("IsWalking", true);
 
         Vector3 moveDirVector = transform.forward;
         if (dir == MoveDir.Backward) moveDirVector = -transform.forward;
 
-        // 2. 이동 로직
         int steps = (dist == -1f) ? 999 : Mathf.RoundToInt(dist);
         int currentStep = 0;
 
         while ((dist == -1f || currentStep < steps))
         {
             float gridSize = 1f;
-
-            // A. 정면 장애물 감지
             if (Physics.Raycast(rb.position + Vector3.up * 0.5f, moveDirVector, out RaycastHit hitObstacle, gridSize, ~0, QueryTriggerInteraction.Ignore))
             {
                 if (hitObstacle.collider.CompareTag("Block"))
                 {
                     PushableBox box = hitObstacle.collider.GetComponent<PushableBox>();
-                    if (box != null)
+                    if (box != null && !box.TryPush(moveDirVector, gridSize))
                     {
-                        if (!box.TryPush(moveDirVector, gridSize))
-                        {
-                            StopAllMovement();
-                            yield break;
-                        }
+                        StopAllMovement();
+                        yield break;
                     }
                 }
                 else if (hitObstacle.collider.CompareTag("Wall"))
@@ -156,12 +203,8 @@ public class CharacterMovement : MonoBehaviour
                 }
             }
 
-            // B. 목표 위치 계산 (높이는 건드리지 않음 -> 중력에 맡김)
             Vector3 startPos = rb.position;
-            // X, Z만 계산하고 Y는 현재 위치 유지 (하지만 중력이 아래로 당김)
             Vector3 targetPos = startPos + (moveDirVector * gridSize);
-
-            // C. 1칸 이동
             if (pendingTeleportOffset != Vector3.zero)
             {
                 targetPos += pendingTeleportOffset;
@@ -169,11 +212,9 @@ public class CharacterMovement : MonoBehaviour
                 pendingTeleportOffset = Vector3.zero;
             }
 
-            // 수평 거리만 계산 (Y축 오차 무시)
             Vector3 startPosFlat = new Vector3(startPos.x, 0, startPos.z);
             Vector3 targetPosFlat = new Vector3(targetPos.x, 0, targetPos.z);
             float distanceToMove = Vector3.Distance(startPosFlat, targetPosFlat);
-
             float travelTime = distanceToMove / moveSpeed;
             float elapsedTime = 0f;
 
@@ -185,37 +226,24 @@ public class CharacterMovement : MonoBehaviour
                     rb.position += pendingTeleportOffset;
                     pendingTeleportOffset = Vector3.zero;
                 }
-
                 elapsedTime += Time.fixedDeltaTime;
-
-                // 현재 진행률에 따른 X, Z 위치 계산
                 float t = elapsedTime / travelTime;
                 Vector3 newPos = Vector3.Lerp(startPos, targetPos, t);
-
-                // [핵심 2] Y축은 물리 엔진이 알아서 하도록 놔둠 (현재 Y 유지 or 중력 반영)
-                // MovePosition은 물리 연산을 포함하므로, 여기서 Y를 강제로 startPos.y로 고정하면 공중부양함.
-                // 따라서 목표지점의 Y를 '현재 Rigidbody의 Y'로 계속 갱신해주는 것이 자연스러움.
-                newPos.y = rb.position.y;
-
+                newPos.y = rb.position.y; 
                 rb.MovePosition(newPos);
                 yield return new WaitForFixedUpdate();
             }
-
-            // 미세 오차 방지를 위해 이동 후 X,Z 좌표 정수화 (Snap)
             SnapToGrid();
             currentStep++;
         }
         if (anim != null) anim.SetBool("IsWalking", false);
     }
 
-    // [신규 기능] 좌표를 정수로 딱 맞춰주는 함수
     private void SnapToGrid()
     {
         Vector3 currentPos = rb.position;
-        // X, Z는 반올림하여 정수로, Y는 그대로 둠 (바닥 높이 유지)
         float snappedX = Mathf.Round(currentPos.x);
         float snappedZ = Mathf.Round(currentPos.z);
-
         rb.MovePosition(new Vector3(snappedX, currentPos.y, snappedZ));
     }
 

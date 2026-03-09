@@ -13,7 +13,7 @@ public class TitleMenu : MonoBehaviour
         if (reachedLevel == 1)
         {
             Debug.Log("새로운 플레이어 감지! Level_1로 바로 이동합니다.");
-            SceneManager.LoadScene("Level_1");
+            SceneManager.LoadScene("Level_0"); //tutorial 씬으로 이동
         }
         // 이미 1탄을 깨서 2탄 이상 열려있는 상태라면 (기존 유저)
         else

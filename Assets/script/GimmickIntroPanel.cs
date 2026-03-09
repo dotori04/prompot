@@ -17,19 +17,30 @@ public class GimmickIntroPanel : MonoBehaviour
     // 플레이어가 팝업을 보는 동안 입력을 못 하도록 막을 용도
     private LocalCommandParser commandParser;
 
+    [Header("옵션 설정")]
+    [Tooltip("체크하면 이미 본 튜토리얼이라도 게임 시작 시 무조건 팝업을 띄웁니다.")]
+    public bool alwaysShow = false; // [추가된 기능]
+
     void Start()
     {
         commandParser = Object.FindFirstObjectByType<LocalCommandParser>();
 
-        // "Tutorial_기믹ID" 값이 0이면 처음 보는 것!
-        if (PlayerPrefs.GetInt("Tutorial_" + gimmickID, 0) == 0)
+        // 1. 저장된 기록 확인 (0이면 처음 보는 것)
+        bool isFirstTime = PlayerPrefs.GetInt("Tutorial_" + gimmickID, 0) == 0;
+
+        // [수정된 로직]
+        // 처음 보거나 OR 항상 보여주기 옵션이 켜져 있다면 -> 팝업 표시
+        if (isFirstTime || alwaysShow)
         {
             ShowIntro();
         }
         else
         {
-            // 이미 깼던 맵이거나 봤던 튜토리얼이면 바로 게임 시작
+            // 이미 봤고, 항상 보여주기도 꺼져 있다면 -> 바로 게임 시작 상태로 전환
             if (introPanel != null) introPanel.SetActive(false);
+            
+            // 팝업이 안 뜨면 입력창이 바로 활성화되어야 함
+            if (commandParser != null) commandParser.gameObject.SetActive(true);
         }
     }
 
@@ -50,6 +61,7 @@ public class GimmickIntroPanel : MonoBehaviour
     public void CloseIntroAndStart()
     {
         // 도감(컴퓨터)에 "이 튜토리얼 봤음" 이라고 저장
+        // (항상 보여주기가 켜져 있어도, 닫는 순간 '봤음' 처리는 해두는 게 안전함)
         PlayerPrefs.SetInt("Tutorial_" + gimmickID, 1);
         PlayerPrefs.Save();
 
