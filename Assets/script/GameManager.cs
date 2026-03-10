@@ -92,6 +92,12 @@ public class GameManager : MonoBehaviour
                 InitializeGame();
             }
         }
+
+        if (Input.GetKeyDown(KeyCode.F12))
+        {
+            LevelData.ResetData();
+            Debug.Log("🛠️ [치트키] 레벨 데이터가 1로 초기화되었습니다!");
+        }
     }
 
     public void CheckResult()
