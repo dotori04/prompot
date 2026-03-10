@@ -11,12 +11,43 @@ public class PushableBox : MonoBehaviour
     private bool isMoving = false;
     private Vector3 targetPos;
 
+    // [추가됨] 시작 위치 저장용 변수
+    private Vector3 initialPos;
+
+    // [추가됨] Awake: 다른 스크립트가 부르기 전에 가장 먼저 자기 위치를 기억해둡니다.
+    void Awake()
+    {
+        initialPos = transform.position;
+    }
+
     void Start()
     {
         rb = GetComponent<Rigidbody>();
         rb.isKinematic = true;
         rb.constraints = RigidbodyConstraints.FreezeRotation;
         gameObject.tag = "Block";
+    }
+
+    // [핵심 추가] 리스폰 시 CharacterMovement가 호출할 초기화 함수
+    public void ResetBox()
+    {
+        // 1. 밀리고 있던 중이라면 강제 정지
+        StopAllCoroutines(); 
+        
+        // 2. 상태 초기화
+        isMoving = false;
+
+        // 3. 원래 위치로 복귀
+        transform.position = initialPos;
+        
+        if (rb != null)
+        {
+            rb.position = initialPos;
+            rb.linearVelocity = Vector3.zero; // 혹시 모를 물리력(관성) 제거
+            rb.angularVelocity = Vector3.zero;
+        }
+
+        Debug.Log($"📦 [PushableBox] {gameObject.name} 원위치로 초기화 완료");
     }
 
     public bool TryPush(Vector3 pushDir, float gridSize)
@@ -26,7 +57,7 @@ public class PushableBox : MonoBehaviour
         targetPos = transform.position + pushDir * gridSize;
         targetPos = new Vector3(Mathf.Round(targetPos.x), transform.position.y, Mathf.Round(targetPos.z));
 
-        // [수정됨] 박스도 이동할 때 트랩 등의 Trigger를 무시하도록 처리
+        // 박스도 이동할 때 트랩 등의 Trigger를 무시하도록 처리
         RaycastHit hit;
         if (Physics.Raycast(transform.position + Vector3.up * 0.5f, pushDir, out hit, gridSize, ~0, QueryTriggerInteraction.Ignore))
         {
@@ -44,22 +75,17 @@ public class PushableBox : MonoBehaviour
     private IEnumerator PushRoutine(Vector3 target)
     {
         isMoving = true;
-        Vector3 startPos = rb.position; // transform 대신 rigidbody 위치 사용
+        Vector3 startPos = rb.position; 
         float elapsedTime = 0f;
 
         while (elapsedTime < pushDuration)
         {
-            // Time.deltaTime 대신 물리 전용 시간인 fixedDeltaTime 사용
             elapsedTime += Time.fixedDeltaTime;
-
-            // 위치를 그냥 덮어씌우는 게 아니라 '물리적으로 밀어냅니다' (Trigger 100% 감지)
             rb.MovePosition(Vector3.Lerp(startPos, target, elapsedTime / pushDuration));
-
-            // Update가 아닌 물리 업데이트 주기에 맞춤
             yield return new WaitForFixedUpdate();
         }
 
-        rb.MovePosition(target); // 최종 위치 보정
+        rb.MovePosition(target); 
         isMoving = false;
     }
 }

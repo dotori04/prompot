@@ -22,24 +22,24 @@ public class CharacterMovement : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
         anim = GetComponentInChildren<Animator>();
-        
+
         rb.useGravity = true;
-        rb.isKinematic = false; 
-        rb.interpolation = RigidbodyInterpolation.Interpolate; 
-        rb.constraints = RigidbodyConstraints.FreezeRotation; 
+        rb.isKinematic = false;
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
+        rb.constraints = RigidbodyConstraints.FreezeRotation;
 
         UnityEngine.Debug.Log("⏳ [CharacterMovement] 게임 시작. 1프레임 대기 중...");
-        yield return null; 
+        yield return null;
 
         UnityEngine.Debug.Log("▶ [CharacterMovement] 대기 완료. Respawn 함수 호출!");
-        Respawn(); 
+        Respawn();
     }
 
     public void Respawn()
     {
         UnityEngine.Debug.Log("🔄 [CharacterMovement] Respawn() 시작됨.");
 
-        // 1. 부모 해제 확인
+        // 1. 부모 해제 확인 (블록 위에 타고 있었을 경우 강제 하차)
         if (transform.parent != null)
         {
             UnityEngine.Debug.Log($"🔓 [CharacterMovement] 현재 부모({transform.parent.name})에서 분리합니다.");
@@ -57,33 +57,41 @@ public class CharacterMovement : MonoBehaviour
         {
             UnityEngine.Debug.Log($"📍 [CharacterMovement] Respawn 위치 찾음: {spawnPoint.name} / 위치: {spawnPoint.transform.position}");
 
-            // 3. 블록 초기화
-            MovingBlock[] blocks = FindObjectsByType<MovingBlock>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            UnityEngine.Debug.Log($"📦 [CharacterMovement] 발견된 MovingBlock 개수: {blocks.Length}개");
-
-            foreach (var block in blocks)
+            // 3-1. 무빙 블록(MovingBlock) 초기화 (꺼져있는 블록까지 모두 포함)
+            MovingBlock[] movingBlocks = FindObjectsByType<MovingBlock>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            UnityEngine.Debug.Log($"📦 [CharacterMovement] 발견된 MovingBlock 개수: {movingBlocks.Length}개");
+            foreach (var block in movingBlocks)
             {
-                block.ResetBlock(); 
+                block.ResetBlock();
             }
 
-            // 4. 이동 로직 정지
+            // 3-2. 밀 수 있는 박스(PushableBox) 초기화 (꺼져있는 박스까지 모두 포함)
+            PushableBox[] pushableBoxes = FindObjectsByType<PushableBox>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            UnityEngine.Debug.Log($"📦 [CharacterMovement] 발견된 PushableBox 개수: {pushableBoxes.Length}개");
+            foreach (var box in pushableBoxes)
+            {
+                box.ResetBox();
+            }
+
+            // 4. 플레이어 이동 로직 정지 (진행 중이던 명령 취소)
             StopAllMovement();
 
             // 5. 강제 이동 실행
             UnityEngine.Debug.Log($"🚀 [CharacterMovement] 플레이어 이동 실행! (현재: {transform.position} -> 목표: {spawnPoint.transform.position})");
-            
+
             transform.position = spawnPoint.transform.position;
             transform.rotation = spawnPoint.transform.rotation;
-            
+
             if (rb != null)
             {
                 rb.position = spawnPoint.transform.position;
                 rb.rotation = spawnPoint.transform.rotation;
-                rb.linearVelocity = Vector3.zero; 
-                rb.angularVelocity = Vector3.zero;
-                rb.Sleep(); 
+                rb.linearVelocity = Vector3.zero;  // 가속도 초기화 (Unity 6 방식)
+                rb.angularVelocity = Vector3.zero; // 회전력 초기화
+                rb.Sleep();                        // 물리 엔진 잠시 재우기 (떨림 방지)
             }
 
+            // 6. 좌표 깔끔하게 보정
             SnapToGrid();
             UnityEngine.Debug.Log($"✅ [CharacterMovement] 이동 완료. 현재 좌표: {transform.position}");
         }
@@ -94,7 +102,7 @@ public class CharacterMovement : MonoBehaviour
     }
 
     // ... (이하 StartSequence 등 나머지 코드는 기존과 동일하므로 생략하지 않고 그대로 유지) ...
-    
+
     public void StartSequence(List<CommandData> commands, System.Action onComplete)
     {
         StopAllMovement();
@@ -124,7 +132,7 @@ public class CharacterMovement : MonoBehaviour
                 break;
             case ActionType.Wait:
                 if (rb != null) { rb.linearVelocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
-                SnapToGrid(); 
+                SnapToGrid();
                 float waitTime = currentCmd.distance > 0 ? currentCmd.distance : 1f;
                 yield return new WaitForSeconds(waitTime);
                 break;
@@ -148,7 +156,7 @@ public class CharacterMovement : MonoBehaviour
         {
             rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
-            SnapToGrid(); 
+            SnapToGrid();
         }
         onSequenceComplete?.Invoke();
     }
@@ -229,7 +237,7 @@ public class CharacterMovement : MonoBehaviour
                 elapsedTime += Time.fixedDeltaTime;
                 float t = elapsedTime / travelTime;
                 Vector3 newPos = Vector3.Lerp(startPos, targetPos, t);
-                newPos.y = rb.position.y; 
+                newPos.y = rb.position.y;
                 rb.MovePosition(newPos);
                 yield return new WaitForFixedUpdate();
             }
